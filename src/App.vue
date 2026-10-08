@@ -5,17 +5,29 @@ import DeckView from './components/DeckView.vue'
 import ExportBar from './components/ExportBar.vue'
 import SwapModal from './components/SwapModal.vue'
 import { useDeck } from './composables/useDeck'
+import { useFavorites } from './composables/useFavorites'
 import type { ExportId } from './lib/printId'
 import type { DeckLine, TcgCard } from './types'
 
 const deck = useDeck()
+const favorites = useFavorites()
 const openKey = ref<string | null>(null)
+const exportBar = ref<InstanceType<typeof ExportBar> | null>(null)
 // Look the line up by key so the modal always sees the latest version (e.g. after resolution).
 const openLine = computed<DeckLine | null>(() => deck.lines.value.find((l) => l.key === openKey.value) ?? null)
 
 function onChoose(card: TcgCard, target: ExportId) {
   if (openKey.value) deck.swap(openKey.value, card, target)
   openKey.value = null
+}
+
+function onApplyFavorites() {
+  const swapped = deck.applyFavorites(favorites.favorites.value)
+  exportBar.value?.flash(
+    swapped
+      ? `${swapped} ${swapped === 1 ? 'linha trocada' : 'linhas trocadas'} pelas favoritas.`
+      : 'Nada para trocar: o deck já usa as favoritas (ou nenhuma se aplica a ele).',
+  )
 }
 
 function onReset() {
@@ -35,10 +47,13 @@ function onReset() {
 
     <template v-else>
       <ExportBar
+        ref="exportBar"
+        :favorites-count="favorites.count.value"
         :text="deck.exportText.value"
         :total="deck.totals.value.all"
         :can-undo="deck.canUndo.value"
         @undo="deck.undo"
+        @apply-favorites="onApplyFavorites"
         @reset="onReset"
       />
 

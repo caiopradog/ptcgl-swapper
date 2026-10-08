@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const props = defineProps<{ text: string; total: number; canUndo: boolean }>()
-const emit = defineEmits<{ undo: []; reset: [] }>()
+const props = defineProps<{ text: string; total: number; canUndo: boolean; favoritesCount: number }>()
+const emit = defineEmits<{ undo: []; reset: []; applyFavorites: [] }>()
 
 const status = ref('')
 let statusTimer: ReturnType<typeof setTimeout> | undefined
@@ -10,8 +10,10 @@ let statusTimer: ReturnType<typeof setTimeout> | undefined
 function flash(message: string) {
   status.value = message
   clearTimeout(statusTimer)
-  statusTimer = setTimeout(() => (status.value = ''), 2500)
+  statusTimer = setTimeout(() => (status.value = ''), 3500)
 }
+
+defineExpose({ flash })
 
 async function copy() {
   try {
@@ -46,6 +48,15 @@ function download() {
   <div class="bar" role="toolbar" aria-label="Ações do deck">
     <span class="bar__total" :class="{ 'bar__total--off': total !== 60 }">{{ total }} cartas</span>
     <div class="bar__actions">
+      <button
+        type="button"
+        class="btn btn--fav"
+        :disabled="!favoritesCount"
+        :title="favoritesCount ? `Trocar as cartas do deck pelas ${favoritesCount} favorita(s)` : 'Marque cartas com ☆ na janela de troca'"
+        @click="emit('applyFavorites')"
+      >
+        ★ Aplicar favoritas<span v-if="favoritesCount" class="fav-count">{{ favoritesCount }}</span>
+      </button>
       <button type="button" class="btn" :disabled="!canUndo" @click="emit('undo')">Desfazer</button>
       <button type="button" class="btn" @click="emit('reset')">Nova lista</button>
       <button type="button" class="btn" @click="download">Baixar .txt</button>
@@ -82,6 +93,21 @@ function download() {
   flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
+}
+.btn--fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffd23f;
+}
+.fav-count {
+  min-width: 1.5em;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ffd23f;
+  color: #000;
+  font-size: 0.8rem;
+  text-align: center;
 }
 .bar__status {
   flex-basis: 100%;

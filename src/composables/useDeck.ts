@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { basicEnergyName, letterFromApiName } from '../config/energyTypes'
-import { applySwap, computeWarnings, sectionOf } from '../lib/deckOps'
+import { applySwap, computeWarnings, printKey, sectionOf } from '../lib/deckOps'
+import { favoriteKeyForLine, type FavoriteEntry, type FavoriteKey } from '../lib/favorites'
 import { exportPtcgl } from '../lib/exportPtcgl'
 import { parsePtcgl } from '../lib/parsePtcgl'
 import { friendlyError } from '../services/http'
@@ -96,19 +97,47 @@ export function createDeckStore(api: Resolver = tcgApi) {
    * names differently from the API ("Telepathic {P} Energy" vs "Telepathic Psychic Energy").
    */
   function swap(key: string, card: TcgCard, target: ExportId) {
-    const line = lines.value.find((l) => l.key === key)
-    if (!line) return
+    const next = swapIn(lines.value, key, card, target)
+    if (next === lines.value) return
+    history.value = [...history.value, lines.value]
+    lines.value = next
+  }
+
+  function swapIn(current: DeckLine[], key: string, card: TcgCard, target: ExportId): DeckLine[] {
+    const line = current.find((l) => l.key === key)
+    if (!line) return current
     const energyLetter = line.energyLetter ? (letterFromApiName(card.name) ?? line.energyLetter) : undefined
-    const next = applySwap(lines.value, key, {
+    return applySwap(current, key, {
       name: energyLetter ? basicEnergyName(energyLetter) : line.name,
       setCode: target.setCode,
       number: target.number,
       card,
       energyLetter,
     })
-    if (next === lines.value) return
-    history.value = [...history.value, lines.value]
-    lines.value = next
+  }
+
+  /**
+   * Swaps every line that has a favorite in its group (see lib/favorites) to that favorite.
+   * All swaps form a single undo step. Returns how many lines were swapped.
+   */
+  function applyFavorites(favorites: Record<FavoriteKey, FavoriteEntry>): number {
+    let next = lines.value
+    let swapped = 0
+    for (const { key } of lines.value) {
+      // Re-read: an earlier swap in this loop may have merged this line into another.
+      const line = next.find((l) => l.key === key)
+      const favKey = line && favoriteKeyForLine(line)
+      const fav = favKey ? favorites[favKey] : undefined
+      if (!line || !fav) continue
+      if (printKey(line.setCode, line.number) === printKey(fav.exportId.setCode, fav.exportId.number)) continue
+      next = swapIn(next, key, fav.card, fav.exportId)
+      swapped += 1
+    }
+    if (swapped) {
+      history.value = [...history.value, lines.value]
+      lines.value = next
+    }
+    return swapped
   }
 
   function undo() {
@@ -131,7 +160,7 @@ export function createDeckStore(api: Resolver = tcgApi) {
 
   return {
     lines, issues, format, imported, resolving, resolveError, bySection, totals, exportText, warnings,
-    canUndo, unresolvedCount, importText, retryUnresolved, swap, undo, reset,
+    canUndo, unresolvedCount, importText, retryUnresolved, swap, applyFavorites, undo, reset,
   }
 }
 

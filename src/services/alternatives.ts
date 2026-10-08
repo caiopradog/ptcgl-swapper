@@ -1,5 +1,5 @@
-import { sectionOf } from '../lib/deckOps'
-import { pokemonAlternatives, trainerAlternatives, energyAlternatives, type Alternatives, type SwapKind } from '../lib/equivalence'
+import { swapKindOf } from '../lib/deckOps'
+import { pokemonAlternatives, trainerAlternatives, energyAlternatives, type Alternatives } from '../lib/equivalence'
 import type { ExportId } from '../lib/printId'
 import type { DeckLine, TcgCard } from '../types'
 import { tcgApi, type TcgApi } from './tcgApi'
@@ -9,12 +9,6 @@ export interface AlternativesResult extends Alternatives {
   exportIds: Map<string, ExportId>
   /** Set when there is nothing to compare against (unresolved non-energy line). */
   notice?: string
-}
-
-export function swapKindOf(line: DeckLine): SwapKind {
-  if (line.energyLetter) return 'energy'
-  if (line.card) return sectionOf(line) === 'pokemon' ? 'pokemon' : 'trainer'
-  return line.sectionHint === 'pokemon' ? 'pokemon' : 'trainer'
 }
 
 export async function findAlternatives(

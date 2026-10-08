@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useFavorites } from '../composables/useFavorites'
 import { ENERGY_TYPE_LABEL_PT } from '../config/energyTypes'
+import { favoriteKeyForCard } from '../lib/favorites'
 import { findAlternatives, type AlternativesResult } from '../services/alternatives'
 import { friendlyError } from '../services/http'
 import type { ExportId } from '../lib/printId'
@@ -9,6 +11,8 @@ import CardTile from './CardTile.vue'
 
 const props = defineProps<{ line: DeckLine | null }>()
 const emit = defineEmits<{ close: []; choose: [card: TcgCard, target: ExportId] }>()
+
+const favorites = useFavorites()
 
 const dialog = ref<HTMLElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
@@ -56,6 +60,21 @@ async function load() {
 function exportLabel(card: TcgCard): string | undefined {
   const id = result.value?.exportIds.get(card.id)
   return id && `${id.setCode} ${id.number}`
+}
+
+function favoriteKey(card: TcgCard) {
+  return result.value ? favoriteKeyForCard(card, result.value.kind) : undefined
+}
+
+/** Only cards that can be exported (and grouped) can be favorites. */
+function canFavorite(card: TcgCard): boolean {
+  return !!favoriteKey(card) && !!result.value?.exportIds.get(card.id)
+}
+
+function toggleFavorite(card: TcgCard) {
+  const key = favoriteKey(card)
+  const target = result.value?.exportIds.get(card.id)
+  if (key && target) favorites.toggle(key, card, target)
 }
 
 function pick(card: TcgCard) {
@@ -175,8 +194,11 @@ onBeforeUnmount(() => {
                   :ptcgo-label="exportLabel(card)"
                   :current="card.id === currentId"
                   :ignore-mark="result.kind === 'energy'"
+                  :favoritable="canFavorite(card)"
+                  :favorite="favorites.isFavorite(favoriteKey(card), card.id)"
                   clickable
                   @select="pick(card)"
+                  @toggle-favorite="toggleFavorite(card)"
                 />
               </div>
             </section>
@@ -194,8 +216,11 @@ onBeforeUnmount(() => {
                   :card="card"
                   :ptcgo-label="exportLabel(card)"
                   :current="card.id === currentId"
+                  :favoritable="canFavorite(card)"
+                  :favorite="favorites.isFavorite(favoriteKey(card), card.id)"
                   clickable
                   @select="pick(card)"
+                  @toggle-favorite="toggleFavorite(card)"
                 />
               </div>
             </section>

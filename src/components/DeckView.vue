@@ -39,7 +39,7 @@ function lineText(line: DeckLine) {
           :approximate="line.approximate"
           :ignore-mark="!!line.energyLetter"
           clickable
-          :aria-label="`Trocar ${line.qty}× ${lineText(line)}`"
+          :label="`Trocar ${line.qty}× ${lineText(line)}`"
           @select="emit('open', line)"
         />
       </div>

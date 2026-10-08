@@ -17,11 +17,16 @@ const props = withDefaults(
     /** Basic energy is always legal, so its mark is never highlighted. */
     ignoreMark?: boolean
     clickable?: boolean
+    /** Accessible name of the clickable tile. */
+    label?: string
+    /** Shows the favorite star (top-right corner); `favorite` fills it. */
+    favoritable?: boolean
+    favorite?: boolean
   }>(),
   { clickable: false },
 )
 
-const emit = defineEmits<{ select: [] }>()
+const emit = defineEmits<{ select: []; toggleFavorite: [] }>()
 
 const mark = computed(() => props.card?.regulationMark ?? '—')
 const markIllegal = computed(() => !!props.card && !props.ignoreMark && !isLegalMark(props.card.regulationMark))
@@ -35,41 +40,61 @@ const tooltip = computed(() => {
 </script>
 
 <template>
-  <component
-    :is="clickable ? 'button' : 'div'"
-    :type="clickable ? 'button' : undefined"
-    class="tile"
-    :class="{ 'tile--clickable': clickable, 'tile--current': current, 'tile--missing': !card && !pending }"
-    @click="clickable && emit('select')"
-  >
-    <div class="tile__art" :title="tooltip">
-      <img v-if="card" :src="card.images.small" :alt="card.name" loading="lazy" />
-      <div v-else-if="pending" class="tile__placeholder"><span class="spinner" aria-hidden="true" /></div>
-      <div v-else class="tile__placeholder tile__placeholder--missing">
-        <span>{{ fallbackText }}</span>
-        <small>não encontrada</small>
+  <!-- The star is a sibling of the tile, not a child: a button can't contain another button. -->
+  <div class="tile-wrap">
+    <component
+      :is="clickable ? 'button' : 'div'"
+      :type="clickable ? 'button' : undefined"
+      class="tile"
+      :class="{ 'tile--clickable': clickable, 'tile--current': current, 'tile--missing': !card && !pending }"
+      :aria-label="label"
+      @click="clickable && emit('select')"
+    >
+      <div class="tile__art" :title="tooltip">
+        <img v-if="card" :src="card.images.small" :alt="card.name" loading="lazy" />
+        <div v-else-if="pending" class="tile__placeholder"><span class="spinner" aria-hidden="true" /></div>
+        <div v-else class="tile__placeholder tile__placeholder--missing">
+          <span>{{ fallbackText }}</span>
+          <small>não encontrada</small>
+        </div>
+        <span v-if="qty !== undefined" class="badge badge--qty" :aria-label="`${qty} cópias`">{{ qty }}×</span>
+        <span v-if="current" class="badge badge--current">Atual</span>
+        <span v-if="approximate" class="badge badge--approx" aria-label="versão aproximada">≈</span>
       </div>
-      <span v-if="qty !== undefined" class="badge badge--qty" :aria-label="`${qty} cópias`">{{ qty }}×</span>
-      <span v-if="current" class="badge badge--current">Atual</span>
-      <span v-if="approximate" class="badge badge--approx" aria-label="versão aproximada">≈</span>
-    </div>
-    <div class="tile__info">
-      <strong class="tile__name">{{ card?.name ?? fallbackText }}</strong>
-      <span class="tile__meta">
-        <span v-if="card">{{ card.set.id }} · #{{ card.number }}</span>
-        <span v-else>{{ ptcgoLabel ?? '' }}</span>
-        <span
-          class="mark"
-          :class="{ 'mark--illegal': markIllegal }"
-          :title="markIllegal ? 'Marca de regulamento fora da lista de legais' : 'Marca de regulamento'"
-        >{{ mark }}</span>
-      </span>
-    </div>
-  </component>
+      <div class="tile__info">
+        <strong class="tile__name">{{ card?.name ?? fallbackText }}</strong>
+        <span class="tile__meta">
+          <span v-if="card">{{ card.set.id }} · #{{ card.number }}</span>
+          <span v-else>{{ ptcgoLabel ?? '' }}</span>
+          <span
+            class="mark"
+            :class="{ 'mark--illegal': markIllegal }"
+            :title="markIllegal ? 'Marca de regulamento fora da lista de legais' : 'Marca de regulamento'"
+          >{{ mark }}</span>
+        </span>
+      </div>
+    </component>
+    <button
+      v-if="favoritable"
+      type="button"
+      class="star"
+      :class="{ 'star--on': favorite }"
+      :aria-pressed="favorite"
+      :aria-label="favorite ? 'Remover dos favoritos' : 'Marcar como favorita'"
+      :title="favorite ? 'Favorita — clique para remover' : 'Marcar como favorita'"
+      @click="emit('toggleFavorite')"
+    >{{ favorite ? '★' : '☆' }}</button>
+  </div>
 </template>
 
 <style scoped>
+.tile-wrap {
+  position: relative;
+  min-width: 0;
+}
 .tile {
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -149,6 +174,38 @@ const tooltip = computed(() => {
   font-size: 0.75rem;
   color: var(--muted);
 }
+.star {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.star:hover,
+.star:focus-visible {
+  opacity: 1;
+  transform: scale(1.12);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.star--on {
+  color: #ffd23f;
+  opacity: 1;
+  text-shadow: 0 0 6px rgb(255 210 63 / 0.6);
+}
 .mark {
   min-width: 1.4em;
   padding: 0 4px;
@@ -178,7 +235,7 @@ const tooltip = computed(() => {
 }
 .badge--current {
   top: 6px;
-  right: 6px;
+  left: 6px;
   background: var(--ok);
   color: #fff;
 }

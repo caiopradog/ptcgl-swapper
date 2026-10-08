@@ -1,5 +1,6 @@
 import { isLegalMark } from '../config/legalMarks'
 import type { DeckLine, DeckWarning, EnergyLetter, Section, TcgCard } from '../types'
+import type { SwapKind } from './equivalence'
 import { normalizeNumber, normalizeText } from './normalize'
 
 export function sectionFromSupertype(supertype: string | undefined): Section | undefined {
@@ -13,6 +14,13 @@ export function sectionFromSupertype(supertype: string | undefined): Section | u
 export function sectionOf(line: DeckLine): Section {
   if (line.energyLetter) return 'energy'
   return sectionFromSupertype(line.card?.supertype) ?? line.sectionHint
+}
+
+/** How alternatives are chosen for a line (special energies count as trainers). */
+export function swapKindOf(line: DeckLine): SwapKind {
+  if (line.energyLetter) return 'energy'
+  if (line.card) return sectionOf(line) === 'pokemon' ? 'pokemon' : 'trainer'
+  return line.sectionHint === 'pokemon' ? 'pokemon' : 'trainer'
 }
 
 /** Identity of a printing as exported: same code + same number = same line. */
