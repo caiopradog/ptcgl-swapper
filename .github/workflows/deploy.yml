@@ -58,12 +58,26 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           # Pinned host key: the job fails instead of trusting an unknown server.
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+          # Fail early with a clear message instead of rsync's "Host key verification failed".
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "::error::O secret SSH_KNOWN_HOSTS está vazio. Gere com: ssh-keyscan -p $SSH_PORT -t ed25519 <SSH_HOST>"
+            exit 1
+          fi
+          entry="$SSH_HOST"
+          [ "$SSH_PORT" = "22" ] || entry="[$SSH_HOST]:$SSH_PORT"
+          if ! ssh-keygen -F "$entry" -f ~/.ssh/known_hosts > /dev/null; then
+            echo "::error::SSH_KNOWN_HOSTS não tem entrada para o SSH_HOST/porta configurados. Rode o ssh-keyscan com exatamente o mesmo host (IP ou domínio) e porta (-p) do SSH_HOST/SSH_PORT."
+            exit 1
+          fi
 
       - name: Enviar arquivos (rsync)
         env:
